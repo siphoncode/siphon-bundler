@@ -1,0 +1,56 @@
+---
+bundler:
+  build: .
+  container_name: bundler
+  tty: true
+  restart: always
+  ports:
+    - "443:443"
+  environment:
+    SIPHON_ENV: $SIPHON_ENV
+    AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+    WEB_HOST: $WEB_HOST
+    RABBITMQ_HOST: $RABBITMQ_HOST
+    RABBITMQ_PORT: $RABBITMQ_PORT
+  links:
+    - memcached_bundler
+    - postgres_bundler
+postgres_bundler:
+  image: postgres:9.4.5
+  container_name: postgres_bundler
+  restart: always
+  environment:
+    PGDATA: /volumes/data
+    POSTGRES_DB: bundler
+    POSTGRES_USER: bundler
+    POSTGRES_PASSWORD: bundler
+  volumes:
+    - /volumes/data
+postgres_backups_bundler:
+  image: getsiphon/postgres-backups:latest
+  container_name: postgres_backups_bundler
+  restart: always
+  environment:
+    AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+    AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+    S3_BUCKET_NAME: $S3_BACKUPS_BUCKET_NAME
+    GPG_PUBKEY_ID: D792803F
+    PREFIX: bundler-backup
+  links:
+    - postgres_bundler:postgres
+memcached_bundler:
+  image: memcached:1.4.25
+  container_name: memcached_bundler
+  restart: always
+  command: memcached -m 128
+custodian_bundler:
+  image: getsiphon/custodian-cron:0.1
+  container_name: custodian_bundler
+  restart: always
+  environment:
+    INTERVAL: 86400 # cleanup once per day
+    MAX_CONTAINER_AGE: "2days"
+    MAX_IMAGE_AGE: "2days" # aggressive to fix npm inode issue
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
